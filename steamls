@@ -20,7 +20,7 @@ for steam_path in "${STEAMAPPS_PATHS[@]}"; do
 done
 
 if [ "$found_steam_path" = false ]; then
-    echo "No Steam library paths found. Please check the STEAMAPPS_PATHS array in the script."
+    printf "No Steam library paths found. Please check the STEAMAPPS_PATHS array in the script."
     exit 1
 fi
 
@@ -32,29 +32,24 @@ for steam_path in "${STEAMAPPS_PATHS[@]}"; do
     fi
 done
 
-# Check if a game name pattern was provided
-if [ $# -eq 0 ]; then
-    # No parameter provided, list all games and compatdata folders
-    eval "find ${FIND_PATHS} -maxdepth 1 -name 'appmanifest_*.acf' -print0" | while IFS= read -r -d '' file; do
-        appid=$(basename "$file" | sed 's/appmanifest_\(.*\)\.acf/\1/')
-        game_name=$(grep -Po '"name"\s+"\K[^"]+' "$file")
-        if [ -n "$game_name" ]; then
-            echo "Compatdata Folder: $appid -> Game: $game_name"
-        fi
-    done | sort -V
-else
-    # Parameter provided, filter by game name pattern
-    GAME_PATTERN="$*" # Capture all arguments as a single pattern
-
-    eval "find ${FIND_PATHS} -maxdepth 1 -name 'appmanifest_*.acf' -print0" | while IFS= read -r -d '' file; do
-        appid=$(basename "$file" | sed 's/appmanifest_\(.*\)\.acf/\1/')
-        game_name=$(grep -Po '"name"\s+"\K[^"]+' "$file")
-
-        # Use case-insensitive regex matching on the game name
-        if [ -n "$game_name" ]; then
-            if [[ "$game_name" =~ ${GAME_PATTERN} ]]; then
-                echo "Compatdata Folder: $appid -> Game: $game_name"
-            fi
-        fi
-    done | sort -V
+# Hold any given game name pattern in here
+GAME_PATTERN=""
+if [ $# -gt 0 ]; then
+    GAME_PATTERN="$*"
 fi
+eval "find ${FIND_PATHS} -maxdepth 1 -name 'appmanifest_*.acf' -print0" | while IFS= read -r -d '' file; do
+    from_path=$(echo "$file" | sed 's#/appmanifest.*##')
+    appid=$(basename "$file" | sed 's/appmanifest_\(.*\)\.acf/\1/')
+    game_name=$(grep -Po '"name"\s+"\K[^"]+' "$file")
+    if [ -n "$game_name" ]; then
+        if [ $# -gt 0 ]; then
+            # Parameter provided, filter by game name pattern
+            if [[ "${game_name,,}" =~ ${GAME_PATTERN,,} ]]; then
+                printf "Compatdata Folder: $appid -> Game: $game_name -> $from_path \n"
+            fi
+        else
+        # No parameter provided, list all games and compatdata folders
+            printf "Compatdata Folder: $appid -> Game: $game_name -> $from_path \n"
+        fi
+    fi
+done | sort -V
